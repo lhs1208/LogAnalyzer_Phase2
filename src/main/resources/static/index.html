@@ -114,6 +114,7 @@
         .status.COMPLETED { background: #e6f4ea; color: #2e7d32; }
         .status.STARTED   { background: #e3f2fd; color: #1565c0; }
         .status.FAILED    { background: #fdecea; color: #c62828; }
+        .status.SCHEDULED { background: #e3f2fd; color: #1565c0; }
 
         button {
             background: #2c3e50;
@@ -240,7 +241,7 @@
         </div>
         <div class="card-right">
             <span class="status" id="status-minuteMonitorJob">-</span>
-            <button onclick="runJob('minuteMonitorJob', this)">실행</button>
+            <button id="btn-minuteMonitorJob" onclick="toggleSchedule('minuteMonitorJob', this)">실행</button>
         </div>
     </div>
 
@@ -422,6 +423,31 @@
             statusEl.textContent = data.status;
             if (data.jobExecutionId) {
                 statusEl.title = 'ExecutionId: ' + data.jobExecutionId;
+            }
+        } catch (e) {
+            statusEl.className = 'status FAILED';
+            statusEl.textContent = 'FAILED';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function toggleSchedule(jobName, btn) {
+        const statusEl = document.getElementById('status-' + jobName);
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/batch/schedule/' + jobName + '/toggle', { method: 'POST' });
+            const data = await res.json();
+
+            if (data.scheduled) {
+                statusEl.className = 'status SCHEDULED';
+                statusEl.textContent = '반복 실행 중 (1분)';
+                btn.textContent = '중지';
+            } else {
+                statusEl.className = 'status';
+                statusEl.textContent = '-';
+                btn.textContent = '실행';
             }
         } catch (e) {
             statusEl.className = 'status FAILED';
