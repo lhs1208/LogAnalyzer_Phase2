@@ -37,6 +37,48 @@
             padding: 0 16px;
         }
 
+        .toolbar {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .toolbar label {
+            font-size: 13px;
+            font-weight: 500;
+            color: #555;
+        }
+
+        .toolbar input[list] {
+            padding: 7px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #333;
+            background: white;
+            min-width: 200px;
+        }
+
+        .toolbar input[list]:disabled {
+            background: #f0f0f0;
+            color: #aaa;
+            cursor: not-allowed;
+        }
+
+        .btn-clear {
+            padding: 7px 10px;
+            background: #eee;
+            color: #666;
+            border-radius: 6px;
+            font-size: 14px;
+            line-height: 1;
+        }
+
+        .btn-clear:hover { background: #ddd; }
+        .btn-clear:disabled { background: #f0f0f0; color: #ccc; }
+
         .card {
             background: white;
             border-radius: 8px;
@@ -72,6 +114,7 @@
         .status.COMPLETED { background: #e6f4ea; color: #2e7d32; }
         .status.STARTED   { background: #e3f2fd; color: #1565c0; }
         .status.FAILED    { background: #fdecea; color: #c62828; }
+        .status.SCHEDULED { background: #e3f2fd; color: #1565c0; }
 
         button {
             background: #2c3e50;
@@ -102,6 +145,67 @@
 
         .admin-link a { color: #2c3e50; text-decoration: none; }
         .admin-link a:hover { text-decoration: underline; }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.open { display: flex; }
+
+        .modal {
+            background: white;
+            border-radius: 10px;
+            padding: 28px 32px;
+            width: 480px;
+            max-width: 90vw;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+
+        .modal h2 { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+        .modal p.modal-desc { font-size: 13px; color: #888; margin-bottom: 20px; }
+
+        .modal label { font-size: 13px; font-weight: 500; display: block; margin-bottom: 6px; }
+
+        .modal input[type="text"] {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+        }
+
+        .modal input[type="text"]:focus { border-color: #2c3e50; }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 24px;
+        }
+
+        .btn-cancel {
+            background: #eee;
+            color: #444;
+        }
+
+        .btn-cancel:hover { background: #ddd; }
+
+        .modal-progress {
+            display: none;
+            margin-top: 16px;
+            font-size: 13px;
+            color: #555;
+            padding: 10px 14px;
+            background: #f5f6fa;
+            border-radius: 6px;
+        }
     </style>
 </head>
 <body>
@@ -112,6 +216,13 @@
 </header>
 
 <main>
+    <div class="toolbar">
+        <label for="base-time">기준시간</label>
+        <input list="timestamp-list" id="base-time" placeholder="초기 설정 완료 후 선택 가능" disabled>
+        <datalist id="timestamp-list"></datalist>
+        <button class="btn-clear" id="btn-clear-time" onclick="clearBaseTime()" disabled title="초기화">×</button>
+    </div>
+
     <div class="card">
         <div class="card-info">
             <h3>초기 설정</h3>
@@ -119,7 +230,7 @@
         </div>
         <div class="card-right">
             <span class="status" id="status-setupJob">-</span>
-            <button onclick="runJob('setupJob', this)">실행</button>
+            <button onclick="openSetupModal()">실행</button>
         </div>
     </div>
 
@@ -130,7 +241,7 @@
         </div>
         <div class="card-right">
             <span class="status" id="status-minuteMonitorJob">-</span>
-            <button onclick="runJob('minuteMonitorJob', this)">실행</button>
+            <button id="btn-minuteMonitorJob" onclick="toggleSchedule('minuteMonitorJob', this)">실행</button>
         </div>
     </div>
 
@@ -151,8 +262,8 @@
             <p>시간 결과 집계 → Dify 일간 분석 → 메일 발송</p>
         </div>
         <div class="card-right">
-            <span class="status" id="status-dailyMonitorJob">-</span>
-            <button onclick="runJob('dailyMonitorJob', this)">실행</button>
+            <span class="status" id="status-testDailyMonitorJob">-</span>
+            <button onclick="runJob('testDailyMonitorJob', this)">실행</button>
         </div>
     </div>
 
@@ -164,6 +275,28 @@
         <div class="card-right">
             <span class="status" id="status-monthlyMonitorJob">-</span>
             <span class="disabled-badge">보류</span>
+        </div>
+    </div>
+
+    <!-- 초기 설정 모달 -->
+    <div class="modal-overlay" id="setup-modal">
+        <div class="modal">
+            <h2>초기 설정</h2>
+            <p class="modal-desc">분석할 서버 로그 파일 경로를 입력하세요. 인코딩·날짜 형식·타임존은 자동으로 탐지됩니다.</p>
+
+            <div id="current-logpath" style="display:none; font-size:12px; color:#555; background:#f5f6fa; padding:8px 12px; border-radius:6px; margin-bottom:16px; word-break:break-all;">
+                현재 설정 경로: <span id="current-logpath-text"></span>
+            </div>
+
+            <label for="log-path">로그 파일 경로</label>
+            <input type="text" id="log-path" placeholder="/var/log/app/application.log" />
+
+            <div class="modal-progress" id="setup-progress">설정 중...</div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeSetupModal()">취소</button>
+                <button id="setup-submit-btn" onclick="submitSetup()">설정 시작</button>
+            </div>
         </div>
     </div>
 
@@ -181,6 +314,102 @@
             }
         });
 
+    let currentLogPath = '';
+
+    function refreshSetupStatus() {
+        fetch('/api/setup/status')
+            .then(r => r.json())
+            .then(d => {
+                if (d.completed) {
+                    const el = document.getElementById('status-setupJob');
+                    el.className = 'status COMPLETED';
+                    el.textContent = 'COMPLETED';
+                    currentLogPath = d.logFilePath || '';
+                    loadTimestamps();
+                }
+            });
+    }
+
+    refreshSetupStatus();
+
+    function clearBaseTime() {
+        const input = document.getElementById('base-time');
+        input.value = '';
+        input.focus();
+    }
+
+    function loadTimestamps() {
+        fetch('/api/log/timestamps')
+            .then(r => r.json())
+            .then(data => {
+                const input = document.getElementById('base-time');
+                const datalist = document.getElementById('timestamp-list');
+                datalist.innerHTML = '';
+                data.timestamps.forEach(ts => {
+                    const opt = document.createElement('option');
+                    opt.value = ts;
+                    datalist.appendChild(opt);
+                });
+                input.disabled = false;
+                input.placeholder = `선택 또는 직접 입력 (${data.dateFormat})`;
+                document.getElementById('btn-clear-time').disabled = false;
+            });
+    }
+
+    function openSetupModal() {
+        document.getElementById('log-path').value = '';
+        document.getElementById('setup-progress').style.display = 'none';
+        const pathBox = document.getElementById('current-logpath');
+        if (currentLogPath) {
+            document.getElementById('current-logpath-text').textContent = currentLogPath;
+            pathBox.style.display = 'block';
+        } else {
+            pathBox.style.display = 'none';
+        }
+        document.getElementById('setup-modal').classList.add('open');
+    }
+
+    function closeSetupModal() {
+        document.getElementById('setup-modal').classList.remove('open');
+    }
+
+    async function submitSetup() {
+        const logPath = document.getElementById('log-path').value.trim();
+        if (!logPath) {
+            alert('로그 파일 경로를 입력해주세요.');
+            return;
+        }
+
+        const submitBtn = document.getElementById('setup-submit-btn');
+        const progressEl = document.getElementById('setup-progress');
+        const statusEl = document.getElementById('status-setupJob');
+
+        submitBtn.disabled = true;
+        progressEl.style.display = 'block';
+        progressEl.textContent = '설정 중...';
+
+        try {
+            const res = await fetch('/api/batch/run/setupJob', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ logFilePath: logPath })
+            });
+            const data = await res.json();
+            statusEl.className = 'status ' + data.status;
+            statusEl.textContent = data.status;
+            closeSetupModal();
+            if (data.status === 'COMPLETED') {
+                refreshSetupStatus();
+            }
+        } catch (e) {
+            progressEl.textContent = '설정 실패. 다시 시도해주세요.';
+            statusEl.className = 'status FAILED';
+            statusEl.textContent = 'FAILED';
+        } finally {
+            submitBtn.disabled = false;
+        }
+    }
+
     async function runJob(jobName, btn) {
         const statusEl = document.getElementById('status-' + jobName);
         btn.disabled = true;
@@ -194,6 +423,31 @@
             statusEl.textContent = data.status;
             if (data.jobExecutionId) {
                 statusEl.title = 'ExecutionId: ' + data.jobExecutionId;
+            }
+        } catch (e) {
+            statusEl.className = 'status FAILED';
+            statusEl.textContent = 'FAILED';
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function toggleSchedule(jobName, btn) {
+        const statusEl = document.getElementById('status-' + jobName);
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/api/batch/schedule/' + jobName + '/toggle', { method: 'POST' });
+            const data = await res.json();
+
+            if (data.scheduled) {
+                statusEl.className = 'status SCHEDULED';
+                statusEl.textContent = '반복 실행 중 (1분)';
+                btn.textContent = '중지';
+            } else {
+                statusEl.className = 'status';
+                statusEl.textContent = '-';
+                btn.textContent = '실행';
             }
         } catch (e) {
             statusEl.className = 'status FAILED';
