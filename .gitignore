@@ -28,7 +28,9 @@ replay_pid*
 target/
 
 # Claude Code
-.claude/
+.claude/*
+!.claude/agents/
+!.claude/workflows/
 
 #etc
 Server/
