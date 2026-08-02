@@ -24,11 +24,25 @@ public class DifyProperties {
     @Setter
     public static class Workflow {
         private FaultCheck faultCheck = new FaultCheck();
+        private AnomalyAnalysis anomalyAnalysis = new AnomalyAnalysis();
+        private OptimizationAnalysis optimizationAnalysis = new OptimizationAnalysis();
     }
 
     @Getter
     @Setter
     public static class FaultCheck {
+        private String apiKey;
+    }
+
+    @Getter
+    @Setter
+    public static class AnomalyAnalysis {
+        private String apiKey;
+    }
+
+    @Getter
+    @Setter
+    public static class OptimizationAnalysis {
         private String apiKey;
     }
 }
