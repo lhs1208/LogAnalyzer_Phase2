@@ -27,6 +27,7 @@ public class BatchConfig {
     private final StepBuilderFactory stepBuilderFactory;
     private final SetupService setupService;
     private final MinuteMonitorService minuteMonitorService;
+    private final HourlyMonitorService hourlyMonitorService;
 
     @Bean
     public Job setupJob() {
@@ -85,14 +86,26 @@ public class BatchConfig {
                     return RepeatStatus.FINISHED;
                 })
                 .build();
-    }    
+    }
 
 
 
     @Bean
     public Job hourlyMonitorJob() {
         return jobBuilderFactory.get("hourlyMonitorJob")
-                .start(placeholderStep("hourlyMonitorStep"))
+                .start(hourlyMonitorStep())
+                .build();
+    }
+
+    @Bean
+    public Step hourlyMonitorStep() {
+
+        return stepBuilderFactory
+                .get("hourlyMonitorStep")
+                .tasklet((contribution, chunkContext) -> {
+                    hourlyMonitorService.execute();
+                    return RepeatStatus.FINISHED;
+                })
                 .build();
     }
 
